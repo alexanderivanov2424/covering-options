@@ -12,7 +12,7 @@ from options.util import AddEdge, neighbor
 #     A = G.copy()
 #     A[t, :] = 0
 #     A[t, t] = 1
-# 
+#
 #     # print('A', A)
 #     A = (A.T / A.sum(axis=1)).T
 #     # print('A', A)
@@ -21,7 +21,7 @@ from options.util import AddEdge, neighbor
 #     for n in range(G.shape[0] * G.shape[0] * 2):
 #         Z.append(B[:, t]) # TODO: We can get the whole vector B[:, t] to speedup by n times
 #         B = np.dot(B, A)
-# 
+#
 #     ret = np.zeros_like(Z[0])
 #     for n in range(len(Z)):
 #         if n == 0:
@@ -48,11 +48,11 @@ def ComputeCoverTimeS(G, s, sample=1000):
     Summary:
         Given a graph adjacency matrix, return the expected cover time starting from node s. We sample a set of trajectories to get it.
     '''
-    
+
     N = G.shape[0]
 
     n_steps = []
-    
+
     for i in range(sample):
         visited = np.zeros(N, dtype=int)
         visited[s] = 1
@@ -65,7 +65,7 @@ def ComputeCoverTimeS(G, s, sample=1000):
             visited[next_s] = 1
             cur_s = next_s
             cur_steps += 1
-            
+
         n_steps.append(cur_steps)
 
     # print('n_steps=', n_steps)
@@ -93,23 +93,23 @@ def ComputeCoverTime(G, samples=1000):
         init = random.randint(0, N-1)
         c_i = ComputeCoverTimeS(G, init, sample=1)
         c_sum += c_i
-        
+
     return float(c_sum) / float(samples)
 
 if __name__ == "__main__":
 
     # PlotConnectivityAndCoverTime(100)
     # exit(0)
-    
+
     Gnx = nx.path_graph(4)
-    
+
     graph_ = nx.to_numpy_matrix(Gnx)
     graph = np.asarray(graph_)
 
     v = ComputeFiedlerVector(Gnx) # numpy array of floats
-    
+
     augGraph = AddEdge(graph, np.argmax(v), np.argmin(v))
-    
+
 
     # print('Graphs')
     # print(graph)
@@ -118,5 +118,3 @@ if __name__ == "__main__":
     print('CoverTime Aug1', t2)
     lb2 = nx.algebraic_connectivity(nx.to_networkx_graph(augGraph))
     print('lambda        ', lb2)
-
-    

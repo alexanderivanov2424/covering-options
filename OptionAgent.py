@@ -7,11 +7,14 @@ from collections import defaultdict
 
 # Other imports.
 from simple_rl.agents.AgentClass import Agent
-from simple_rl.agents import DQNAgent, DDPGAgent, LinearQAgent, RandomAgent, RandomContAgent
-from simple_rl.agents.func_approx.ExperienceBuffer import ExperienceBuffer
-from simple_rl.agents.func_approx.Features import Fourier
+from simple_rl.agents import DQNAgent, LinearQAgent #RandomContAgent, DDPGAgent, RandomAgent
+# from simple_rl.agents.func_approx.ExperienceBuffer import ExperienceBuffer
+from options.option_generation.OptionAgent import ExperienceBuffer
+# from simple_rl.agents.func_approx.Features import Fourier
 
 from options.OptionWrapper import OptionWrapper, CoveringOption
+
+Fourier = None
 
 class OptionAgent(Agent):
     """
@@ -21,7 +24,7 @@ class OptionAgent(Agent):
     3. Spectrum method to Generate options
     """
     NAME = "option-agent"
-    
+
     def __init__(self, sess=None, obs_dim=None, obs_bound=None, action_dim=None, action_bound=None, num_actions=None, num_options=0, gamma=0.99, epsilon=0.0, tau=0.001, high_method='linear', low_method='linear', f_func='fourier', batch_size=32, buffer_size=32, low_update_freq=1, option_batch_size=32, option_buffer_size=32, high_update_freq=10, option_freq=256, option_min_steps=512, init_all=True, init_around_goal=True, init_dist=0.9, term_dist=0.1, bidirectional=False, name=NAME):
         # TODO: Implement an interface for discrete action space
         Agent.__init__(self, name=name, actions=[])
@@ -41,7 +44,7 @@ class OptionAgent(Agent):
         #     self.continuous_action = True
         # else:
         #     self.continuous_action = False
-            
+
         self.epsilon = epsilon
         self.gamma = gamma
         self.batch_size = batch_size
@@ -75,7 +78,7 @@ class OptionAgent(Agent):
         self.high_method = high_method
         self.low_method = low_method
         self.f_func = f_func
-        
+
         if self.high_method == 'linear':
             # low_bound = np.asarray([0.0, 0.0, -2.0, -2.0])
             # up_bound = np.asarray([1.0, 1.0, 2.0, 2.0])
@@ -85,14 +88,14 @@ class OptionAgent(Agent):
             # low_bound = np.asarray([0.0, 0.0, -2.0, -2.0])
             # up_bound = np.asarray([1.0, 1.0, 2.0, 2.0])
             features = Fourier(state_dim=obs_dim, bound=obs_bound, order=3)
-            self.high_control = LinearQAgent(actions=range(self.num_options), feature=features, sarsa=True, name=self.name+"_high")            
+            self.high_control = LinearQAgent(actions=range(self.num_options), feature=features, sarsa=True, name=self.name+"_high")
         elif self.high_method == 'dqn':
             self.high_control = DQNAgent(sess=self.sess, obs_dim=obs_dim, num_actions=self.num_options, buffer_size=0, gamma=self.gamma, epsilon=self.epsilon, learning_rate=0.001, tau=self.tau, name=self.name+"_high")
         elif self.high_method == 'rand':
             self.high_control = RandomAgent(range(self.num_options), name=self.name+"_high")
         else:
             assert(False)
-                    
+
         self.reset()
 
     def act(self, state, reward, train=True, data=None):
@@ -103,7 +106,7 @@ class OptionAgent(Agent):
             # print('exper_buffer.size()=', self.option_buffer.size())
             # print('batchsize=', self.option_batch_size)
             self.high_control.train_batch(s, a, r, s2, t, duration=duration, batch_size=self.option_batch_size)
-            
+
             # print('high_ctrl loss=', loss)
 
         if self.total_steps > 0 and self.total_steps % self.low_update_freq == 0 and self.experience_buffer.size() > self.batch_size and train:
@@ -121,7 +124,7 @@ class OptionAgent(Agent):
             else:
                 self.experience_buffer.add((self.prev_state, self.prev_action, reward, state, state.is_terminal(), self.current_option))
 
-                
+
         # Generate options
         if self.total_steps % self.option_freq == 0 and self.option_buffer.size() >= self.option_batch_size and self.total_steps >= self.option_min_steps and len(self.options) < self.num_options:
             options = self.generate_option()
@@ -148,17 +151,17 @@ class OptionAgent(Agent):
 
                 prev_option = self.current_option
                 self.current_option = self.pick_option(state)
-                
+
                 # if self.options[prev_option].is_terminal(state) and prev_option != 0:
                 #     assert(prev_option != self.current_option)
-                
+
                 self.num_op_executed[self.current_option] += 1
 
                 self.prev_op_state, self.prev_option = state, self.current_option
 
                 self.op_cumulative_reward = 0
                 self.op_num_steps = 0
-                
+
             # else:
                 # Contiue on
                 # print('option continues!')
@@ -169,12 +172,12 @@ class OptionAgent(Agent):
         # print('current_option = ', self.current_option)
         # print('#options = ', len(self.options))
         assert(self.current_option < len(self.options))
-        
+
         prim_action = self.options[self.current_option].act(state)
 
 
         # print('current_option=', self.current_option, 'action=', prim_action)
-        
+
         self.prev_state, self.prev_action = state, prim_action
 
         if data is not None:
@@ -195,8 +198,8 @@ class OptionAgent(Agent):
         #     self.current_option = None
         #     self.op_cumulative_reward = 0
         #     self.op_num_steps = 0
-            
-        
+
+
         return prim_action
 
     def end_of_episode(self):
@@ -209,7 +212,7 @@ class OptionAgent(Agent):
         print('#Episode=', self.episode_number, '#steps=', self.curr_step, 'Total_reward=', self.total_reward)
         print('#Options executed = ', self.num_op_executed)
 
-        # TODO: Store the transition 
+        # TODO: Store the transition
 
             # if state.is_terminal():
             #     print('isterminal')
@@ -218,10 +221,10 @@ class OptionAgent(Agent):
         if not (self.prev_op_state is None) and not (self.prev_option is None) and not (self.prev_state.is_terminal()):
             # TODO: DOes it ignoring the last reward added to the agent?
             self.option_buffer.add((self.prev_op_state, self.prev_option, self.op_cumulative_reward, self.prev_state, self.prev_state.is_terminal(), self.op_num_steps))
-                
+
             self.num_op_executed[self.current_option] += 1
-        
-        
+
+
         self.curr_step = 0
         self.current_option = None
         self.op_cumulative_reward = 0
@@ -265,7 +268,7 @@ class OptionAgent(Agent):
                     print('Q(s,', o, ') =', val)
             assert(maxqop >= 0)
             return maxqop
-            
+
     def generate_option(self):
         op_name = "_op_num" + str(len(self.options))
         options = []
@@ -277,7 +280,7 @@ class OptionAgent(Agent):
             option2.train(experience_buffer=self.experience_buffer)
             options.append(option2)
         return options
-            
+
     def get_applicable_options(self, state):
         l = []
         # av = np.zeros(self.num_options, dtype=np.float32)
@@ -289,7 +292,7 @@ class OptionAgent(Agent):
     # def train(self, s, a, r, s2, t, duration, batch_size):
     #     # TODO: What does this line do?
     #     targetVals = self.high_control_target.predict_value(s2) # TODO: Do we need self.sess here? why?
-    #     
+    #
     #     y = np.zeros(self.batch_size)
     #     for i in range(self.batch_size):
     #         if t[i]:
@@ -298,39 +301,39 @@ class OptionAgent(Agent):
     #             y[i] = r[i] + math.pow(self.gamma, duration[i]) * targetVals[i]
     #     loss = self.high_control_main.train(s, a, y)
     #     print('loss for the main=', loss)
-    # 
+    #
     #     self.sess.run(self.update_target_params)
-    #     
+    #
     #     return loss
 
     def train_options(self):
         for op in self.options:
             # TODO: Number of steps for the options needs to be stored
             op.train(self.experience_buffer, self.batch_size)
-        
-            
+
+
     def reset(self):
 
         # Save the
         if self.curr_instances > 0:
             self.generated_options[self.curr_instances] = self.options
-        
+
         self.high_control.reset()
-        
+
         self.option_buffer = ExperienceBuffer(buffer_size=self.option_buffer_size)
-        
+
         self.experience_buffer = ExperienceBuffer(buffer_size=self.buffer_size)
         self.prev_state, self.prev_action = None, None
         self.prev_op_state, self.prev_option = None, None
         self.curr_step, self.total_steps = 0, 0
         self.total_reward = 0
         self.episode_number = 0
-        
+
         self.num_op_executed = [0] * self.num_options
-        
+
         primitive_agent = CoveringOption(sess=self.sess, obs_dim=self.obs_dim, obs_bound=self.obs_bound, action_dim=self.action_dim, action_bound=self.action_bound, num_actions=self.num_actions, low_method=self.low_method, f_func=self.f_func, name=self.name + "_inst" + str(self.curr_instances) + "_prim")
-        
-        
+
+
         self.options = []
         self.options.append(primitive_agent)
 
@@ -354,7 +357,7 @@ class OptionAgent(Agent):
             (dict) key=param_name (str) --> val=param_val (object).
         '''
         param_dict = defaultdict(int)
-        
+
         param_dict["high_method"] = self.high_method
         param_dict["low_method"] = self.low_method
         param_dict["num_options"] = self.num_options
@@ -375,9 +378,9 @@ class OptionAgent(Agent):
         param_dict["init_around_goal"] = int(self.init_around_goal)
         param_dict["init_dist"] = self.init_dist
         param_dict["term_dist"] = self.term_dist
-        
+
         # param_dict["high_params"] = self.high_control.get_parameters()
         # param_dict["low_params"] = self.low_control.get_parameters()
-        
+
 
         return param_dict

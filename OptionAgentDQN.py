@@ -7,7 +7,8 @@ import tflearn
 # Other imports.
 from simple_rl.agents.AgentClass import Agent
 from simple_rl.agents import DQNAgent, DDPGAgent
-from simple_rl.agents.func_approx.ExperienceBuffer import ExperienceBuffer
+#from simple_rl.agents.func_approx.ExperienceBuffer import ExperienceBuffer
+from options.option_generation.OptionAgent import ExperienceBuffer
 
 from options.OptionWrapper import OptionWrapper
 
@@ -19,7 +20,7 @@ class OptionAgent(Agent):
     3. Spectrum method to Generate options
     """
     NAME = "option-agent"
-    
+
     def __init__(self, sess=None, obs_dim=None, action_dim=None, action_bound=None, num_actions=None, num_options=0, gamma=0.99, epsilon=0.05, tau=0.001, name=NAME):
         # TODO: Implement an interface for discrete action space
         Agent.__init__(self, name=name, actions=[])
@@ -36,7 +37,7 @@ class OptionAgent(Agent):
             self.continuous_action = True
         else:
             self.continuous_action = False
-            
+
         self.epsilon = epsilon
         self.gamma = gamma
         self.update_freq = 1
@@ -63,7 +64,7 @@ class OptionAgent(Agent):
                                                                           tf.multiply(self.target_network_params[i], 1.0 - self.tau))
                                      for i in range(len(self.target_network_params))]
 
-        
+
         self.reset()
 
     def act(self, state, reward, train=True):
@@ -72,8 +73,8 @@ class OptionAgent(Agent):
         if self.total_steps > 0 and self.total_steps % self.option_freq == 0 and self.option_buffer.size() > self.option_b_size and train:
             s, a, r, s2, t, duration = self.option_buffer.sample_op(self.option_b_size)
             loss = self.train(s, a, r, s2, t, duration, self.option_b_size)
-            
-            
+
+
             # print('high_ctrl loss=', loss)
 
         if self.total_steps > 0 and self.total_steps % self.update_freq == 0 and self.experience_buffer.size() > self.batch_size and train:
@@ -84,12 +85,12 @@ class OptionAgent(Agent):
         if not (self.prev_state is None) and not (self.prev_action is None) and train:
             self.experience_buffer.add((self.prev_state, self.prev_action, reward, state_d, state.is_terminal()))
 
-                
+
         # Generate options
         if self.total_steps % self.option_freq == 0 and self.experience_buffer.size() > self.option_b_size and len(self.options) < self.num_options:
             option = self.generate_option()
             self.options.append(option)
-            
+
         # Pick an option
         if self.current_options is None:
             self.current_option = self.pick_option(state_d)
@@ -102,16 +103,16 @@ class OptionAgent(Agent):
                     # TODO: Discount factor for the Value
                     self.option_buffer.add((self.prev_op_state, self.prev_option, self.op_cumulative_reward, state_d, state.is_terminal(), self.op_num_steps))
 
-                self.current_option = self.pick_option(state_d)                
+                self.current_option = self.pick_option(state_d)
                 self.num_op_executed[self.current_option] += 1
 
                 self.prev_op_state, self.prev_option = state_d, self.current_option
 
                 self.op_cumulative_reward = 0
                 self.op_num_steps = 0
-                
+
             else:
-                # Contiue on 
+                # Contiue on
                 self.op_cumulative_reward += reward * self.gamma
                 self.op_num_steps += 1
 
@@ -119,7 +120,7 @@ class OptionAgent(Agent):
         # print('current_option = ', self.current_option)
         # print('#options = ', len(self.options))
         assert(self.current_option < len(self.options))
-        
+
         prim_action = self.options[self.current_option].act(state)
 
         self.prev_state, self.prev_action = state_d, prim_action
@@ -128,7 +129,7 @@ class OptionAgent(Agent):
         self.total_steps += 1
 
         self.total_reward += reward
-        
+
         if state.is_terminal():
             print('#Episode=', self.curr_episodes, '#steps=', self.curr_step, 'Total_reward=', self.total_reward)
             print('#Options executed = ', self.num_op_executed)
@@ -138,8 +139,8 @@ class OptionAgent(Agent):
             self.current_option = None
             self.op_cumulative_reward = 0
             self.op_num_steps = 0
-            
-        
+
+
         return prim_action
 
     def pick_option(self, state_d):
@@ -147,7 +148,7 @@ class OptionAgent(Agent):
 
         # print('pick_option: state=', state)
         # print('applicable_options=', applicable_options)
-        
+
         if random.random() < self.epsilon:
             applicable_option_list = []
             for i, op in enumerate(applicable_options):
@@ -158,7 +159,7 @@ class OptionAgent(Agent):
             # TODO: List up available options
             # available_options = XXX
             return self.high_control_target.get_best_action(state_d, applicable_options)[0]
-            
+
     def generate_option(self):
         # TODO: Retrieve samples from the experience buffer.
         #       Train
@@ -168,8 +169,8 @@ class OptionAgent(Agent):
         option = OptionWrapper(sess=self.sess, obs_dim=self.obs_dim, action_dim=self.action_dim, action_bound=self.action_bound, num_actions=self.num_actions, continuous_action=self.continuous_action, name=self.name + "_inst" + str(self.curr_instances) + op_name)
 
         return option
-        
-            
+
+
     def get_applicable_options(self, state_d):
         # TODO: Let's first assume all options are always available
         av = np.zeros(self.num_options, dtype=np.float32)
@@ -181,7 +182,7 @@ class OptionAgent(Agent):
     def train(self, s, a, r, s2, t, duration, batch_size):
         # TODO: What does this line do?
         targetVals = self.high_control_target.predict_value(s2) # TODO: Do we need self.sess here? why?
-        
+
         y = np.zeros(self.batch_size)
         for i in range(self.batch_size):
             if t[i]:
@@ -192,15 +193,15 @@ class OptionAgent(Agent):
         print('loss for the main=', loss)
 
         self.sess.run(self.update_target_params)
-        
+
         return loss
 
     def train_options(self):
         for op in self.options:
             # TODO: Number of steps for the options needs to be stored
             op.train(self.experience_buffer, self.batch_size)
-        
-            
+
+
     def reset(self):
         # remove all options
         # reset the networks
@@ -208,25 +209,25 @@ class OptionAgent(Agent):
         self.high_control_target.initialize()
 
         self.option_buffer = ExperienceBuffer(buffer_size=20000)
-        
+
         self.experience_buffer = ExperienceBuffer(buffer_size=100000)
         self.prev_state, self.prev_action = None, None
         self.prev_op_state, self.prev_option = None, None
         self.curr_step, self.total_steps = 0, 0
         self.curr_episodes = 0
         self.total_reward = 0
-        
+
         self.num_op_executed = np.zeros(self.num_options, dtype=np.int32)
-        
+
         primitive_agent = OptionWrapper(sess=self.sess, obs_dim=self.obs_dim, action_dim=self.action_dim, action_bound=self.action_bound, num_actions=self.num_actions, continuous_action=self.continuous_action, name=self.name + "_inst" + str(self.curr_instances) + "_prim")
-        
+
         self.options = []
         self.options.append(primitive_agent)
         self.current_options = None
         self.op_cumulative_reward = 0
         self.op_num_steps = 0
         self.curr_instances += 1
-        
+
 
 
 
@@ -244,14 +245,14 @@ class QNetwork():
         self.obs_dim = obs_dim
         self.name = name
         self.obs, self.q_estm = self.q_network(scope=name + "_q")
-        
+
         self.applicable_options = tf.placeholder(tf.float32, shape=[None, self.num_options], name=name+"_q_applicable_options")
 
         qmin = tf.reduce_min(self.q_estm, axis=1) - 1.0
 
         # If applicable_op is True, then return q_estm. Return qmin - 1.0 else.g
         self.applicable_q_value = tf.multiply(self.q_estm, self.applicable_options) + tf.multiply(qmin, tf.add(1.0, -self.applicable_options))
-        
+
         # TODO: How do we make the agent choose the applicable options.
         # self.applicable_q_value = tf.multiply(self.applicable_options, self.q_estm)
         self.best_action = tf.argmax(self.applicable_q_value, 1)
@@ -266,10 +267,10 @@ class QNetwork():
         self.optimizer = tf.train.AdamOptimizer(self.learning_rate)
         self.optimize = self.optimizer.minimize(self.loss)
 
-        
+
         self.network_params = tf.get_collection(tf.GraphKeys.VARIABLES, scope=name + "_q")
         self.initializer = tf.initializers.variables(self.network_params + self.optimizer.variables())
-        
+
 
     def q_network(self, scope):
         # TODO: This is probably too deep?
@@ -307,7 +308,7 @@ class QNetwork():
         # print('obs_.shape=', obs_.shape)
         # print('applicable_options.shape=', applicable_options)
         ao_ = np.reshape(applicable_options, (1, self.num_options))
-        
+
         return self.sess.run(self.best_action, feed_dict={
             self.obs: obs_,
             self.applicable_options: ao_

@@ -26,10 +26,10 @@ def FiedlerOptions(G, k, subgoal=False):
         A = G.copy()
 
     options = []
-    
+
     eigenvalues = []
     eigenvectors = []
-    
+
     while no < k:
         v = ComputeFiedlerVector(nx.to_networkx_graph(A))
         lmd = ComputeConnectivity(A)
@@ -39,18 +39,18 @@ def FiedlerOptions(G, k, subgoal=False):
         # for i, val in enumerate(v):
         #     if val > maxv - 0.02:
         #         maxs.append(i)
-        #         
+        #
         # minv = np.argmin(v)
         # mins = []
         # for i, val in enumerate(v):
         #     if val < minv + 0.02:
         #         mins.append(i)
-        # 
+        #
         # print('maxs=', maxs)
         maxs = [np.argmax(v)]
         mins = [np.argmin(v)]
         option = (maxs, mins)
-        
+
         options.append(option)
         if subgoal:
             B = A.copy()
@@ -84,25 +84,34 @@ def FiedlerOptions(G, k, subgoal=False):
 if __name__ == "__main__":
 
     Gnx = nx.path_graph(10)
-    
+
+    Gnx = nx.cycle_graph(30)
     graph = nx.to_numpy_matrix(Gnx)
+    print('#'*10)
+    for i in range(10):
+        t = ComputeCoverTime(graph)
+        print('Number of Options',i)
+        print('CoverTime     ', t)
+        lb = nx.algebraic_connectivity(nx.to_networkx_graph(graph))
+        print('lambda        ', lb)
+        print()
+        graph, options, _, _ = FiedlerOptions(graph, 8)
 
-    proposedAugGraph, options = FiedlerOptions(graph, 8)
+    # proposedAugGraph, options, _, _ = FiedlerOptions(graph, 8)
+    #
+    # pGnx = nx.to_networkx_graph(proposedAugGraph)
+    #
+    # nx.draw_spectral(pGnx)
+    # plt.savefig('drawing.pdf')
+    #
 
-    pGnx = nx.to_networkx_graph(proposedAugGraph)
-    
-    nx.draw_spectral(pGnx)
-    plt.savefig('drawing.pdf')
 
-    
-    t = ComputeCoverTime(graph)
-    print('CoverTime     ', t)
-    lb = nx.algebraic_connectivity(nx.to_networkx_graph(graph))
-    print('lambda        ', lb)
-
-    t3 = ComputeCoverTime(proposedAugGraph)
-    print('CoverTime Aug ', t3)
-    lb3 = nx.algebraic_connectivity(nx.to_networkx_graph(proposedAugGraph))
-    print('lambda        ', lb3)
-
-    
+    # t = ComputeCoverTime(graph)
+    # print('CoverTime     ', t)
+    # lb = nx.algebraic_connectivity(nx.to_networkx_graph(graph))
+    # print('lambda        ', lb)
+    #
+    # t3 = ComputeCoverTime(proposedAugGraph)
+    # print('CoverTime Aug ', t3)
+    # lb3 = nx.algebraic_connectivity(nx.to_networkx_graph(proposedAugGraph))
+    # print('lambda        ', lb3)

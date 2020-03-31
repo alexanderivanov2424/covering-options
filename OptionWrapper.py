@@ -5,10 +5,15 @@ import tflearn
 import os
 
 from simple_rl.mdp.StateClass import State
-from simple_rl.agents.func_approx.ExperienceBuffer import ExperienceBuffer
-from simple_rl.agents.func_approx.Features import Fourier, Monte, Subset, AgentPos
-from simple_rl.agents import DQNAgent, DDPGAgent, LinearQAgent, RandomAgent, RandomContAgent, DiaynAgent
+# from simple_rl.agents.func_approx.ExperienceBuffer import ExperienceBuffer
+# from simple_rl.agents.func_approx.Features import Fourier, Monte, Subset, AgentPos
+from simple_rl.agents import DQNAgent, LinearQAgent, RandomAgent# DiaynAgent, DDPGAgent,  RandomContAgent
 
+ExperienceBuffer = None
+Fourier = None
+Monte = None
+Subset = None
+AgentPos = None
 
 class OptionWrapper():
     def __init__(self):
@@ -22,7 +27,7 @@ class OptionWrapper():
 
     def is_terminal(self, s):
         pass
-    
+
     def train(self, experience_buffer, batch_size):
         pass
 
@@ -47,7 +52,7 @@ class DiaynOption(OptionWrapper):
     def is_terminal(self, s):
         # TODO: When should we terminate diayn?
         val = np.random.choice([True, False], p=[self.term_prob, 1.0 - self.term_prob])
-        
+
         return val
 
     def train(self, experience_buffer, batch_size):
@@ -55,11 +60,11 @@ class DiaynOption(OptionWrapper):
 
         # print('o=', o)
         o = [n - 1 for n in o]
-        
+
         self.agent.train_batch(s, a, r, s2, t, o, batch_size=batch_size)
 
-        
-    
+
+
 class CoveringOption(OptionWrapper):
     """
     Wrapper to describe options
@@ -77,7 +82,7 @@ class CoveringOption(OptionWrapper):
             self.sess = sess
         self.option_b_size = option_b_size
         self.sp_training_steps = sp_training_steps
-        
+
         self.low_method = low_method
         self.f_func = f_func
         self.n_units = n_units
@@ -100,7 +105,7 @@ class CoveringOption(OptionWrapper):
             self.setup_networks()
         if experience_buffer is not None:
             self.train_f_function(experience_buffer)
-            
+
     def setup_networks(self):
         print('f_func=', self.f_func)
         if self.f_func == 'fourier':
@@ -118,7 +123,7 @@ class CoveringOption(OptionWrapper):
             self.f_function = SpectrumNetwork(self.sess, obs_dim=self.obs_dim, feature=features, n_units=self.n_units, name=self.name)
         elif self.f_func == 'nnc':
             # Convolutions
-            self.f_function = SpectrumNetwork(self.sess, obs_dim=self.obs_dim, n_units=self.n_units, conv=True, name=self.name)            
+            self.f_function = SpectrumNetwork(self.sess, obs_dim=self.obs_dim, n_units=self.n_units, conv=True, name=self.name)
         elif self.f_func == 'rand':
             self.f_function = None
         elif self.f_func == 'agent':
@@ -131,7 +136,7 @@ class CoveringOption(OptionWrapper):
 
         if self.f_function is not None:
             self.f_function.initialize()
-        
+
         if self.low_method == 'linear':
             # low_bound = np.asarray([0.0, 0.0, -2.0, -2.0])
             # up_bound = np.asarray([1.0, 1.0, 2.0, 2.0])
@@ -139,7 +144,7 @@ class CoveringOption(OptionWrapper):
             self.agent = LinearQAgent(actions=range(self.num_actions), feature=features, name=self.name)
         elif self.low_method == 'ddpg':
             # TODO: Using on-policy method is not good for options? is DDPG off-policy?
-            self.agent = DDPGAgent(self.sess, obs_dim=self.obs_dim, action_dim=self.action_dim, action_bound=self.action_bound, name=self.name) 
+            self.agent = DDPGAgent(self.sess, obs_dim=self.obs_dim, action_dim=self.action_dim, action_bound=self.action_bound, name=self.name)
         elif self.low_method == 'dqn':
             self.agent = DQNAgent(self.sess, obs_dim=self.obs_dim, num_actions=self.num_actions, gamma=0.99, name=self.name)
         elif self.low_method == 'rand':
@@ -170,12 +175,12 @@ class CoveringOption(OptionWrapper):
 
     def is_terminal(self, state):
         assert(isinstance(state, State))
-        
+
         if self.term_fn is None:
             return True
         else:
             f_value = self.f_function(state)[0][0]
-            
+
             bound = self.lower_th
 
             # print('f_value, bound = ', f_value, bound)
@@ -194,7 +199,7 @@ class CoveringOption(OptionWrapper):
 
     def train_f_function(self, experience_buffer):
         assert(self.option_b_size is not None)
-            
+
         self.f_function.initialize()
 
         for _ in range(self.sp_training_steps):
@@ -203,10 +208,10 @@ class CoveringOption(OptionWrapper):
             # Even if we switch the order of s and s2, we get the same eigenfunction.
             # next_f_value = self.f_function(s)
             # self.f_function.train(s2, next_f_value)
-            
+
             next_f_value = self.f_function(s2)
             self.f_function.train(s, next_f_value)
-        
+
         self.upper_th, self.lower_th = self.sample_f_val(experience_buffer, self.init_dist, self.term_dist)
 
         # print('init_th, term_th = ', init_th, term_th)
@@ -217,7 +222,7 @@ class CoveringOption(OptionWrapper):
             else:
                 self.init_fn = lambda x: x < self.lower_th
         else:
-            self.term_fn = lambda x: x < self.lower_th        
+            self.term_fn = lambda x: x < self.lower_th
             if self.init_around_goal:
                 self.init_fn = lambda x: x < self.lower_th
             else:
@@ -231,7 +236,7 @@ class CoveringOption(OptionWrapper):
         n_samples = buf_size
 
         s = [experience_buffer.buffer[i][0] for i in range(experience_buffer.size())]
-        
+
         # s, _, _, _, _ = experience_buffer.sample(n_samples)
         f_values = self.f_function(s)
         if type(f_values) is list:
@@ -258,7 +263,7 @@ class CoveringOption(OptionWrapper):
             self.agent.train_batch(s, a, r, s2, t, batch_size=batch_size)
         else:
             r_shaped = []
-            
+
             for i in range(batch_size):
                 # Reward is given if it minimizes the f-value
                 # r_s = self.f_function(np.reshape(s[i].data, (1, s[i].data.shape[0]))) - self.f_function(np.reshape(s2[i].data, (1, s2[i].data.shape[0]))) + r[i]
@@ -287,13 +292,13 @@ class CoveringOption(OptionWrapper):
         if self.reversed_dir:
             print('restored reversed direction')
             self.init_fn = lambda x: x < self.lower_th
-            self.term_fn = lambda x: x > self.upper_th        
+            self.term_fn = lambda x: x > self.upper_th
         else:
             self.init_fn = lambda x: x > self.upper_th
-            self.term_fn = lambda x: x < self.lower_th        
+            self.term_fn = lambda x: x < self.lower_th
 
         # print('f_func=', self.f_func)
-        
+
         self.setup_networks()
 
         self.f_function.restore(directory)
@@ -320,12 +325,12 @@ class CoveringOption(OptionWrapper):
             self.agent.save(directory, name=self.name + 'rev')
         else:
             self.agent.save(directory)
-        
-   
+
+
 ######################
 # self.loss = tflearn.mean_square(self.f_value, self.next_f_value) + self.beta * tf.reduce_mean(tf.multiply(self.f_value - self.delta, self.next_f_value - self.delta))
 
-        
+
 class SpectrumNetwork():
     NAME = "spectrum"
     def __init__(self, sess, obs_dim=None, learning_rate=0.001, training_steps=100, batch_size=32, n_units=16, beta=2.0, delta=0.1, feature=None, conv=False, name=NAME):
@@ -336,7 +341,7 @@ class SpectrumNetwork():
         self.obs_dim = obs_dim
 
         self.n_units = n_units
-        
+
         # self.beta = 1000000.0
         self.beta = beta
         self.delta = 0.05
@@ -345,7 +350,7 @@ class SpectrumNetwork():
         self.feature = feature
 
         self.conv = conv
-        
+
         self.name = name
 
         self.obs, self.f_value = self.network(scope=name+"_eval")
@@ -357,10 +362,10 @@ class SpectrumNetwork():
                     self.beta * tf.reduce_mean(tf.multiply(self.f_value - self.delta, self.next_f_value - self.delta)) + \
                     self.beta * tf.reduce_mean(self.f_value * self.f_value * self.next_f_value * self.next_f_value) + \
                     self.beta * (self.f_value - self.next_f_value) # This is to let f(s) <= f(s').
-        
+
         # with tf.variable_scope(self.name, reuse=tf.AUTO_REUSE):
         self.optimizer = tf.train.AdamOptimizer(learning_rate)
-            
+
         self.optimize = self.optimizer.minimize(self.loss)
 
         self.network_params = tf.get_collection(tf.GraphKeys.GLOBAL_VARIABLES, scope=name + "_eval")
@@ -369,7 +374,7 @@ class SpectrumNetwork():
         # print('network param names for ', self.name)
         # for n in self.network_params:
         #     print(n.name)
-            
+
         self.saver = tf.train.Saver(self.network_params)
 
     def network(self, scope):
@@ -378,7 +383,7 @@ class SpectrumNetwork():
             indim = self.obs_dim
         else:
             indim = self.feature.num_features()
-            
+
         obs = tf.placeholder(tf.float32, [None, indim], name=self.name+"_obs")
 
         with tf.variable_scope(scope, reuse=tf.AUTO_REUSE):
@@ -430,7 +435,7 @@ class SpectrumNetwork():
             obs = self.feature.feature(state, 0)
             obs = np.asarray(obs)
             obs = np.reshape(obs, (1, self.feature.num_features()))
-            
+
         return self.sess.run(self.f_value, feed_dict={
             self.obs: obs
         })
@@ -440,7 +445,7 @@ class SpectrumNetwork():
         return self.sess.run(self.f_value, feed_dict={
             self.obs: features
         })
-    
+
     def __call__(self, obs):
         if type(obs) is list:
             ret = []
@@ -451,7 +456,7 @@ class SpectrumNetwork():
 
     def restore(self, directory, name='spectrum_nn'):
         self.saver.restore(self.sess, directory + '/' + name)
-    
+
     def save(self, directory, name='spectrum_nn'):
         self.saver.save(self.sess, directory + '/' + name)
 
@@ -466,11 +471,11 @@ class SpectrumNetwork():
 #         self.n_features = self.feature.num_features()
 #         self.network = SpectrumNetwork(sess=self.sess, obs_dim=self.n_features)
 #         self.name = name
-# 
-#             
+#
+#
 #     def initialize(self):
 #         self.network.initialize()
-# 
+#
 #     def train(self, obs, next_f_value):
 #         if type(obs) is list:
 #             features = []
@@ -480,7 +485,7 @@ class SpectrumNetwork():
 #         else:
 #             features = self.feature(obs)
 #         self.network.train(features, next_f_value)
-# 
+#
 #     def __call__(self, obs):
 #         if type(obs) is list:
 #             features = []
@@ -490,10 +495,10 @@ class SpectrumNetwork():
 #         else:
 #             features = self.feature(obs)
 #         return self.network(features)
-# 
+#
 #     def restore(self, directory):
 #         self.network.restore(directory)
-# 
+#
 #     def save(self, directory):
 #         self.network.save(directory)
 #
@@ -535,10 +540,10 @@ class SpectrumFourier():
 
                 fval = self.f_value(s[i])
                 fval2 = next_f_value[i]
-                
+
                 # print('fval=', fval)
                 # print('fval2=', fval2)
-                
+
                 gradient = 2.0 * fval - 2.0 * fval2 + self.beta * (fval2 - self.delta) + self.beta * (2 * fval * fval2 * fval2)
 
                 # Sparsely update the weights (only update weights associated with the action we used).
@@ -555,17 +560,17 @@ class SpectrumFourier():
 
             loss = max(sum_grads)
             print('iter=', niter, 'loss=', loss)
-                
+
     def f_value(self, state):
         # print('type(state=', type(state))
         # print('f_value::state=', state)
         assert(isinstance(state, State))
         feature = self.feature.feature(state, 0)
         return np.dot(self.weights, feature)
-            
+
     def initialize(self):
         pass
-        
+
     def __call__(self, obs):
         if type(obs) is list:
             ret = []
@@ -576,12 +581,6 @@ class SpectrumFourier():
 
     def restore(self, directory, name='spectrum_fourier'):
         self.weights = np.load(directory + '/' + name + '.npy')
-    
+
     def save(self, directory, name='spectrum_fourier'):
         np.save(directory + '/' + name + '.npy', self.weights)
-        
-    
-
-    
-
-        

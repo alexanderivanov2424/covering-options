@@ -27,12 +27,12 @@ def neighbor(graph, n):
         Given a graph adjacency matrix and a node, return a list of its neighbor nodes.
     '''
     assert(graph.ndim == 2)
-    
-    array = graph[n]
+
+    array = np.array(graph)[n]
     # print('array=', array)
     l = []
     for i in range(len(array)):
-        
+
         if array[i] == 1:
             l.append(i)
 
@@ -41,7 +41,7 @@ def neighbor(graph, n):
     # if i is n:
     #     print('i, n =', i, n)
     return l
-    
+
 def GetRandomWalk(G):
     ##########################
     # PLEASE WRITE A TEST CODE
@@ -83,7 +83,7 @@ def GetCost(G):
     # Given an adjacency matrix, return all-pair shortest path distance
     D = np.full_like(G, -1, dtype=int)
     N = int(G.shape[0])
-    
+
     mt = G
     distance = 1
     while distance < N:
@@ -104,4 +104,3 @@ def AddEdge(G, vi, vj):
     augGraph[vi, vj] = 1
     augGraph[vj, vi] = 1
     return augGraph
-
