@@ -85,18 +85,18 @@ if __name__ == "__main__":
 
     Gnx = nx.path_graph(10)
 
-    Gnx = nx.cycle_graph(30)
+    #Gnx = nx.cycle_graph(30)
     graph = nx.to_numpy_matrix(Gnx)
     print('#'*10)
-    for i in range(10):
+    for i in range(5):
         t = ComputeCoverTime(graph)
         print('Number of Options',i)
         print('CoverTime     ', t)
         lb = nx.algebraic_connectivity(nx.to_networkx_graph(graph))
         print('lambda        ', lb)
         print()
-        graph, options, _, _ = FiedlerOptions(graph, 8)
-
+        graph, options, _, _ = FiedlerOptions(graph, 1)
+        print(options)
     # proposedAugGraph, options, _, _ = FiedlerOptions(graph, 8)
     #
     # pGnx = nx.to_networkx_graph(proposedAugGraph)
