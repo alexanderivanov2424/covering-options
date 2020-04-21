@@ -120,7 +120,10 @@ def AverageShortestOptions(G, Pairs, k, delta = 1):
                 D[source[0],target] = source[1][target]
 
         # weight of each node pair
-        W = get_weight_matrix(len(A),Pairs)
+        if Pairs = None:
+            W = np.ones((len(A),len(A)),,dtype='int')
+        else:
+            W = get_weight_matrix(len(A),Pairs)
 
         P_out = np.clip(W*(D-2*delta),0,None)
         P_in = np.clip(W.T*(D-2*delta),0,None)
@@ -128,14 +131,6 @@ def AverageShortestOptions(G, Pairs, k, delta = 1):
 
 
         C = np.hstack((W,W.T))
-
-
-        """
-        MULTIPLYING BY WRONG W
-        BIG BAD
-        HERE W IS BETWEEN FACTORY AND CITY ORIGIN
-        SHOULD BE CITY W
-        """
 
         def cost(a,b):
             D_min = np.minimum(D[a],D[b])
