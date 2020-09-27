@@ -3,7 +3,7 @@ import random
 from time import sleep
 
 from simple_rl.tasks import GridWorldMDP
-from simple_rl.tasks import GymMDP # Gym
+# from simple_rl.tasks import GymMDP # Gym
 
 # from simple_rl.planning.ValueIterationClass import ValueIteration
 from options.option_generation.ValueIterationClass import ValueIteration
@@ -32,7 +32,7 @@ def GetIncidenceMatrix(mdp, n_traj=1, eps_len=10):
              states: mapping from matrix index to state
     '''
     # TODO: What is the best way to represent the incidence matrix?
-    # Required output: 
+    # Required output:
 
 
     pairs = [] # List of state transition pairs (s, s')
@@ -48,7 +48,7 @@ def GetIncidenceMatrix(mdp, n_traj=1, eps_len=10):
     cur_h = hash(cur_s)
     hash_to_ind[cur_h] = 0
     ind_to_s[0] = cur_s
-    
+
 
     n_states = 1
 
@@ -60,10 +60,10 @@ def GetIncidenceMatrix(mdp, n_traj=1, eps_len=10):
         #     cur_h = get_h(mdp)
         # else:
         cur_h = hash(cur_s)
-            
+
         # print('cur_s=', cur_s)
         # print('type(cur_s)=', type(cur_s))
-        
+
         for j in range(eps_len):
             # sleep(0.01)
             # print('hash=', hash(cur_s.data.tostring()))
@@ -79,7 +79,7 @@ def GetIncidenceMatrix(mdp, n_traj=1, eps_len=10):
 
             # print('nextstate=', mdp.next_state.data)
             # print('env.state=', mdp.env.state)
-            
+
             # print('type(next_s)=', type(next_s))
 
             # if type(mdp) is GymMDP:
@@ -103,7 +103,7 @@ def GetIncidenceMatrix(mdp, n_traj=1, eps_len=10):
             cur_h = next_h
 
     # print('pairs=', pairs)
-    
+
     matrix = np.zeros((n_states, n_states), dtype=int)
 
     for i in range(len(pairs)):
@@ -116,4 +116,3 @@ def GetIncidenceMatrix(mdp, n_traj=1, eps_len=10):
 
     mdp.reset()
     return matrix, ind_to_s
-

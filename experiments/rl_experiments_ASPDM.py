@@ -1,9 +1,13 @@
 #!/usr/bin/env python
+
 import matplotlib
-matplotlib.use('Agg')
+#matplotlib.use('Agg')
 from matplotlib import rcParams
 rcParams['font.family'] = 'sans-serif'
 rcParams['font.sans-serif'] = ['DejaVu Sans']
+# import matplotlib.rcsetup as rcsetup
+# print(rcsetup.all_backends)
+matplotlib.use('TkAgg')
 import matplotlib.pyplot as plt
 
 # Python imports.
@@ -21,11 +25,11 @@ import matplotlib.pyplot as plt
 import networkx as nx
 
 # simple_rl
-from simple_rl.tasks import GridWorldMDP, GymMDP, TaxiOOMDP, HanoiMDP
+from simple_rl.tasks import GridWorldMDP, TaxiOOMDP, HanoiMDP#, GymMDP
 from simple_rl.tasks.grid_world.GridWorldMDPClass import make_grid_world_from_file
-from simple_rl.tasks.race_track.RaceTrackMDPClass import make_race_track_from_file
+#from simple_rl.tasks.race_track.RaceTrackMDPClass import make_race_track_from_file
 from simple_rl.planning.ValueIterationClass import ValueIteration
-from simple_rl.agents import QLearningAgent, LinearQAgent, DQNAgent, RandomAgent
+from simple_rl.agents import QLearningAgent, LinearQAgent, RandomAgent#, DQNAgent
 from simple_rl.run_experiments import run_agents_on_mdp
 from simple_rl.abstraction import AbstractionWrapper, aa_helpers, ActionAbstraction, OnlineAbstractionWrapper
 
@@ -34,6 +38,8 @@ from simple_rl.abstraction import AbstractionWrapper, aa_helpers, ActionAbstract
 from options.option_generation.fiedler_options import FiedlerOptions
 from options.option_generation.eigenoptions import Eigenoptions
 from options.option_generation.betweenness_options import BetweennessOptions
+from options.option_generation.ASPDM_options import AverageShortestOptions
+
 from options.option_generation.graph_drawing_options import GraphDrawingOptions
 from options.graph.cover_time import ComputeCoverTime
 from options.graph.spectrum import ComputeConnectivity
@@ -65,6 +71,8 @@ def GetOption(mdp, k=1, sample=False, matrix=None, intToS=None, method='eigen', 
         B, options, vectors = Eigenoptions(A, k)
     elif method == 'fiedler':
         B, options, _, vectors = FiedlerOptions(A, k)
+    elif method == 'ASPDM':
+        B, options = AverageShortestOptions(A, None, k)
     elif method == 'bet':
         # TODO: B is empty.
         B, options, vectors = BetweennessOptions(A, k)
@@ -90,6 +98,9 @@ def GetOption(mdp, k=1, sample=False, matrix=None, intToS=None, method='eigen', 
     # for evec in evectors:
     #     print('evec=', evec)
     #     print('type(evec)=', type(evec))
+
+    if method == 'ASPDM':
+        return B, egoal_list, intToS, None
 
     evector_list = [dict()] * (len(options) * 2)
     for i, o in enumerate(options):
@@ -247,7 +258,7 @@ def test_utility(args, mdp):
 
         agents.append(eigenoption_agent)
 
-    run_agents_on_mdp(agents, mdp, instances=args.ninstances, episodes=args.nepisodes, steps=args.nsteps, open_plot=True, track_disc_reward=True, cumulative_plot=True, dir_for_plot="results/")
+    exp = run_agents_on_mdp(agents, mdp, instances=args.ninstances, episodes=args.nepisodes, steps=args.nsteps, open_plot=True, track_disc_reward=True, cumulative_plot=True, dir_for_plot="results/")
 
 
 def test_offline_agent(args, mdp):
@@ -283,6 +294,7 @@ def test_offline_agent(args, mdp):
         origMatrix, intToS = GetAdjacencyMatrix(mdp)
     fiedlerMatrix, foptions, _, fvectors = GetOption(mdp, n_options, matrix=origMatrix, intToS=intToS, option_type=option_type, method='fiedler')
     eigenMatrix, eoptions, _, evectors = GetOption(mdp, n_options, matrix=origMatrix, intToS=intToS, option_type=option_type, method='eigen')
+    ASPDMMatrix, ASPDMoptions, _, ASPDMvectors = GetOption(mdp, n_options, matrix=origMatrix, intToS=intToS, option_type=option_type, method='ASPDM')
     _, boptions, _, bvectors = GetOption(mdp, n_options, matrix=origMatrix, intToS=intToS, option_type=option_type, method='bet')
 #        fiedlerMatrix, foptions, _, fvectors = GetOption(mdp, n_options, option_type=option_type, method='fiedler')
 #        eigenMatrix, eoptions, _, evectors = GetOption(mdp, n_options, option_type=option_type, method='eigen')
@@ -366,12 +378,13 @@ def test_offline_agent(args, mdp):
 
 
     # fig, ax = plt.subplots()
-
+    #
     # im = ax.imshow(norm(val), visible=False, cmap=cmap)
     # im = ax.imshow(norm(val), visible=False, cmap=cmap)
     # fig.colorbar(im)
 
     plt.imshow(rgba, interpolation='nearest')
+    plt.show()
 
     # X, Y = np.meshgrid(x, y)
     #
@@ -391,6 +404,7 @@ def test_offline_agent(args, mdp):
     # from matplotlib import cm
     # ax.plot_surface(X, Y, Z, cmap=cm.coolwarm)
 
+
     if euclid:
         plt.savefig('euclid.pdf', bbox_inches='tight', pad_inches=0)
     else:
@@ -399,7 +413,7 @@ def test_offline_agent(args, mdp):
     ###############################################################
     ###############################################################
 
-    exit(0)
+    #exit(0)
 
     #################################
     # Point options
@@ -416,17 +430,31 @@ def test_offline_agent(args, mdp):
         # TODO: how is the state represented here in intToS?
         eigenoption_agent = build_subgoal_option_agent(mdp, eoptions, known_region, vectors=evectors, name='-eigen', n_trajs=op_n_episodes, n_steps=op_n_steps)
         fiedleroption_agent = build_subgoal_option_agent(mdp, foptions, known_region, vectors=fvectors, name='-fiedler', n_trajs=op_n_episodes, n_steps=op_n_steps)
+        ASPDMoption_agent = build_subgoal_option_agent(mdp, foptions, known_region, vectors=fvectors, name='-ASPDM', n_trajs=op_n_episodes, n_steps=op_n_steps)
         betoption_agent = build_subgoal_option_agent(mdp, boptions, known_region, vectors=fvectors, name='-bet', n_trajs=op_n_episodes, n_steps=op_n_steps)
     else:
         eigenoption_agent = build_point_option_agent(mdp, eoptions, agent=QLearningAgent, policy='vi', name='-eigen')
         fiedleroption_agent = build_point_option_agent(mdp, foptions, agent=QLearningAgent, policy='vi', name='-fiedler')
+        ASPDMoption_agent = build_point_option_agent(mdp, foptions, agent=QLearningAgent, policy='vi', name='-ASPDM')
         betoption_agent = build_point_option_agent(mdp, boptions, agent=QLearningAgent, policy='vi', name='-bet')
 
     ql_agent = QLearningAgent(actions=mdp.get_actions(), default_q=1.0)
     rand_agent = RandomAgent(mdp.get_actions())
 
     # run_agents_on_mdp([ql_agent, rand_agent], mdp, instances=n_instances, episodes=n_episodes, steps=n_steps, open_plot=True, cumulative_plot=True, track_disc_reward=True, dir_for_plot="results/" + now_ts)
-    run_agents_on_mdp([fiedleroption_agent, eigenoption_agent, betoption_agent, ql_agent, rand_agent], mdp, instances=n_instances, episodes=n_episodes, steps=n_steps, open_plot=True, cumulative_plot=True, track_disc_reward=True, dir_for_plot="results/", reset_at_terminal=False)
+    exp = run_agents_on_mdp([fiedleroption_agent, eigenoption_agent, ASPDMoption_agent, betoption_agent, ql_agent, rand_agent], mdp, instances=n_instances, episodes=n_episodes, steps=n_steps, open_plot=True, cumulative_plot=True, track_disc_reward=True, dir_for_plot="results/", reset_at_terminal=False)
+
+    for agent in exp.states.keys():
+        states = exp.states[agent]
+        X = [s.x for s in states]
+        Y = [s.y for s in states]
+
+        fig, ax = plt.subplots()
+        h = ax.hist2d(X,Y)
+        plt.colorbar(h[3], ax=ax)
+        plt.title(agent)
+        plt.show()
+    plt.show(block=True)
 
 def test_online_agent(args, mdp):
     '''
@@ -462,9 +490,10 @@ def test_online_agent(args, mdp):
     # TODO: Add an arugment for selecting option generation method.
     fiedler_agent = build_online_subgoal_option_agent(mdp, agent=QLearningAgent, n_ops=n_options, freqs=freqs, op_n_episodes=op_n_episodes, op_n_steps=op_n_steps, method='fiedler', name='-fiedler')
     eigen_agent = build_online_subgoal_option_agent(mdp, agent=QLearningAgent, n_ops=n_options, freqs=freqs, op_n_episodes=op_n_episodes, op_n_steps=op_n_steps, method='eigen', name='-eigen')
+    ASPDM_agent = build_online_subgoal_option_agent(mdp, agent=QLearningAgent, n_ops=n_options, freqs=freqs, op_n_episodes=op_n_episodes, op_n_steps=op_n_steps, method='ASPDM', name='-ASPDM')
     bet_agent = build_online_subgoal_option_agent(mdp, agent=QLearningAgent, n_ops=n_options, freqs=freqs, op_n_episodes=op_n_episodes, op_n_steps=op_n_steps, method='bet', name='-bet')
 
-    run_agents_on_mdp([fiedler_agent, eigen_agent, ql_agent, rand_agent], mdp, instances=n_instances, episodes=n_episodes, steps=n_steps, open_plot=True, track_disc_reward=True, cumulative_plot=False, dir_for_plot="results/")
+    run_agents_on_mdp([fiedler_agent, eigen_agent, ASPDM_agent, ql_agent, rand_agent], mdp, instances=n_instances, episodes=n_episodes, steps=n_steps, open_plot=True, track_disc_reward=True, cumulative_plot=False, dir_for_plot="results/")
 
 
 if __name__ == "__main__":
@@ -517,7 +546,7 @@ if __name__ == "__main__":
     dom, task = args.task.split('_')
 
     if dom == 'grid':
-        mdp = make_grid_world_from_file('../tasks/' + task + '.txt')
+        mdp = make_grid_world_from_file('options/tasks/' + task + '.txt')
     elif dom == 'taxi':
         width = 4
         height = 4

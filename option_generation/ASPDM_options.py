@@ -5,6 +5,14 @@ import matplotlib.pyplot as plt
 from options.graph.cover_time import AddEdge, ComputeCoverTime
 from options.graph.spectrum import ComputeFiedlerVector, ComputeConnectivity
 
+
+"""
+TODO: Generates too many options?? Why? How?
+
+double check algo because probably wrong (need paper)
+
+"""
+
 def AverageShortestOptions_not_optimized(G, P, k, delta = 1, subgoal=False):
 
     X = nx.to_networkx_graph(G)
@@ -55,7 +63,7 @@ def AverageShortestOptions_not_optimized(G, P, k, delta = 1, subgoal=False):
         def cost(a,b):
             cost = 0
             for city in duplicates:
-                # chopse the closest facility
+                # choose the closest facility
                 f = a if D[a,city[0]] < D[b,city[0]] else b
                 #either connect and pay d * w or deny service and pay penalty
                 cost += min(D[f,city[0]]*city[1],city[2])
@@ -105,7 +113,7 @@ def AverageShortestOptions_not_optimized(G, P, k, delta = 1, subgoal=False):
     return A, options
 
 
-def AverageShortestOptions(G, Pairs, k, delta = 1):
+def AverageShortestOptions_Probably_Wrong(G, Pairs, k, delta = 1):
     A = G.copy()
 
     options = []
@@ -120,10 +128,10 @@ def AverageShortestOptions(G, Pairs, k, delta = 1):
                 D[source[0],target] = source[1][target]
 
         # weight of each node pair
-        if Pairs = None:
-            W = np.ones((len(A),len(A)),,dtype='int')
-        else:
+        try:
             W = get_weight_matrix(len(A),Pairs)
+        except:
+            W = np.ones((len(A),len(A)),dtype='int')
 
         P_out = np.clip(W*(D-2*delta),0,None)
         P_in = np.clip(W.T*(D-2*delta),0,None)
@@ -173,6 +181,72 @@ def AverageShortestOptions(G, Pairs, k, delta = 1):
 
     return A, options
 
+def AverageShortestOptions(G, Pairs, k, delta = 1):
+    A = G.copy()
+
+    options = []
+
+    # pair wise distances in graph
+    D_dict = nx.all_pairs_shortest_path_length(nx.to_networkx_graph(A))
+    D = np.zeros(A.shape,dtype='int')
+    for source in D_dict:
+        for target in range(len(A)):
+            D[source[0],target] = source[1][target]
+
+    # weight of each node pair
+
+    try:
+        W = get_weight_matrix(len(A),Pairs)
+    except:
+        W = np.ones((len(A),len(A)),dtype='int')
+
+
+    P = np.clip(W*(D-2*delta),0,None)
+
+
+
+    #F is a list of facilities (indicies)
+    def cost(S):
+        cost = 0
+        distances = np.amin(D[:,S],axis=1)
+        for city in range(len(A)):
+            W_scaled = W * distances[city]
+            cost += np.sum(np.minimum(W_scaled[city], P[city]))
+            cost += np.sum(np.minimum(W_scaled[:,city], P[:,city]))
+        return cost
+
+
+    S = list(range(k+1)) #need k+1 nodes for k edge star
+    while True:
+        min_cost = cost(S)
+        best_set = S.copy()
+
+        # loop over all a to remove from S and all b to add
+        for a in S:
+            for b in range(len(A)):
+                if b in S:
+                    continue
+                S_ = S.copy()
+                S_.remove(a)
+                S_.append(b)
+
+                c = cost(S_)
+                if c < min_cost:
+                    min_cost = c
+                    best_set = S_
+
+        if set(S) == set(best_set):
+            break
+        S = best_set
+
+    for i in range(1,len(S)):
+        option = (S[0], S[i])
+        options.append(option)
+
+        A[option[0],option[1]] = 1
+        A[option[1],option[0]] = 1
+
+    return A, options
 
 def BruteOptions(G, P, k, delta = 1, subgoal=False):
 
@@ -267,12 +341,12 @@ def compare_to_brute_exp(graph, P, W, num_options, show_graphs=False):
     ASPDM_list = [avg_dist]
     Brute_list = [avg_dist]
 
-    graph_alg = graph.copy()
+    graph_alg_orig = graph.copy()
     graph_brute = graph.copy()
 
     for i in range(num_options):
         print(i,"/", num_options,"\t\t",end="\r")
-        graph_alg, options_alg = AverageShortestOptions(graph_alg, P, 1)
+        graph_alg, options_alg = AverageShortestOptions(graph_alg_orig, P, i)
         avg_dist_alg = average_shortest_distance(graph_alg,W)
 
         graph_brute, options_brute = BruteOptions(graph_brute, P, 1)
@@ -294,7 +368,7 @@ def compare_to_brute_exp(graph, P, W, num_options, show_graphs=False):
 
     return ASPDM_list, Brute_list, graph_alg, graph_brute
 
-def compare_to_brute_multiple_exp(N, num_trials, show_graphs = False):
+def compare_to_brute_multiple_exp(N, num_options, num_trials, show_graphs = False):
 
     P = np.array([np.random.permutation(np.arange(N))[:2] for i in range(N*N)])
     # P = []
@@ -308,11 +382,12 @@ def compare_to_brute_multiple_exp(N, num_trials, show_graphs = False):
 
     for i in range(num_trials):
         print("trial ",(i+1)," of ",num_trials)
-        Gnx = nx.barabasi_albert_graph(n=N,m=1)
-        # Gnx = nx.path_graph(N)
+        #Gnx = nx.barabasi_albert_graph(n=N,m=1)
+        Gnx = nx.fast_gnp_random_graph(n=N,p=.2)
+
         graph = nx.to_numpy_matrix(Gnx).astype(dtype='int')
 
-        ASPDM_list, Brute_list, graph_alg, graph_brute = compare_to_brute_exp(graph,P,W,N)
+        ASPDM_list, Brute_list, graph_alg, graph_brute = compare_to_brute_exp(graph,P,W,num_options)
         A.append(ASPDM_list)
         B.append(Brute_list)
         if show_graphs:
@@ -328,8 +403,13 @@ def compare_to_brute_multiple_exp(N, num_trials, show_graphs = False):
     # X = np.arange(A.shape[1])
     # plt.fill_between(X,np.max(A,axis=0),np.min(A,axis=0),alpha=.5)
     # plt.fill_between(X,np.max(B,axis=0),np.min(B,axis=0),alpha=.5)
+    fig = plt.figure()
     [plt.plot(data,color='orange') for data in A]
     [plt.plot(data,color='blue') for data in B]
+    plt.xlabel('number of options')
+    plt.ylabel('average shortest distance')
+    plt.title('ASPDM-orange  Brute-Blue')
+    fig.show()
     plt.show()
 
 
@@ -359,7 +439,6 @@ def base_experiment_compare(graph, P, W):
         print(options_alg,options_brute)
 
         graph = graph_alg
-
 
 
 def convert_file_to_graph_and_P(file):
@@ -463,28 +542,31 @@ def test_domain():
         print("#"*10)
 
 if __name__ == "__main__":
-    # N = 30
-    # Gnx = nx.cycle_graph(N)
-    # Gnx = nx.path_graph(N)
+    N = 10
+    #Gnx = nx.cycle_graph(N)
+    Gnx = nx.path_graph(N)
 
-    # Gnx = nx.random_regular_graph(d=2, n=N)
-    # Gnx = nx.barabasi_albert_graph(n=N,m=1)
-    # graph = nx.to_numpy_matrix(Gnx).astype(dtype='int')
+    #Gnx = nx.random_regular_graph(d=2, n=N)
+    #Gnx = nx.barabasi_albert_graph(n=N,m=1)
+    graph = nx.to_numpy_matrix(Gnx).astype(dtype='int')
 
-    # P = np.array([np.random.permutation(np.arange(N))[:2] for i in range(N)])
-    # P = []
-    # [[P.append((i,j)) for i in range(N)] for j in range(N)]
-    # P = np.array(P)
-    # W = get_weight_matrix(N,P)
+    #P = np.array([np.random.permutation(np.arange(N))[:2] for i in range(N)])
+    P = []
+    [[P.append((i,j)) for i in range(N)] for j in range(N)]
+    P = np.array(P)
+    W = get_weight_matrix(N,P)
 
-    test_domain()
+    #test_domain()
 
-    # compare_to_brute_multiple_exp(30,5)
+    compare_to_brute_multiple_exp(75, 10 ,3)
+
+    #A, options = AverageShortestOptions(graph,P,3)
 
 
-    # base_experiment_compare(graph,P,W)
-    # ASPDM_list,Brute_list,_,_ = compare_to_brute_exp(graph,P,W,20)
+    #base_experiment_compare(graph,P,W)
+    # ASPDM_list,Brute_list,_,_ = compare_to_brute_exp(graph,P,W,3, True)
     # plt.plot(ASPDM_list,label="ASPDM")
     # plt.plot(Brute_list,label="Brute")
     # plt.legend()
     # plt.show()
+    # plt.pause(1000000000000000000)

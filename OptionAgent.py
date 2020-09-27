@@ -7,10 +7,10 @@ from collections import defaultdict
 
 # Other imports.
 from simple_rl.agents.AgentClass import Agent
-from simple_rl.agents import DQNAgent, LinearQAgent #RandomContAgent, DDPGAgent, RandomAgent
-# from simple_rl.agents.func_approx.ExperienceBuffer import ExperienceBuffer
+from simple_rl.agents import LinearQAgent, RandomContAgent, RandomAgent#, DQNAgent,  DDPGAgent
+from simple_rl.agents.func_approx.ExperienceBuffer import ExperienceBuffer
 from options.option_generation.OptionAgent import ExperienceBuffer
-# from simple_rl.agents.func_approx.Features import Fourier
+from simple_rl.agents.func_approx.Features import Fourier
 
 from options.OptionWrapper import OptionWrapper, CoveringOption
 
