@@ -384,7 +384,7 @@ def test_offline_agent(args, mdp):
     # fig.colorbar(im)
 
     plt.imshow(rgba, interpolation='nearest')
-    plt.show()
+    plt.show(block=True)
 
     # X, Y = np.meshgrid(x, y)
     #
@@ -453,7 +453,7 @@ def test_offline_agent(args, mdp):
         h = ax.hist2d(X,Y)
         plt.colorbar(h[3], ax=ax)
         plt.title(agent)
-        plt.show()
+        plt.show(block=True)
     plt.show(block=True)
 
 def test_online_agent(args, mdp):

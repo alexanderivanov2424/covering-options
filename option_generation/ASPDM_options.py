@@ -1,190 +1,46 @@
 import numpy as np
 from numpy import linalg
 import networkx as nx
+
+
 import matplotlib.pyplot as plt
 from options.graph.cover_time import AddEdge, ComputeCoverTime
 from options.graph.spectrum import ComputeFiedlerVector, ComputeConnectivity
 
+import itertools
 
 """
-TODO: Generates too many options?? Why? How?
+Pseudo Code
 
-double check algo because probably wrong (need paper)
+Select a candidate set of states
+while True:
+    for each possible a in S and for each possible b in S complement:
+        S' = S - a + b
+        cost(S') = sum of min(weight(c) * min(distance(city,s) for s in S), penalty(c) for c in states)
+    Let S = the S' with smallest cost(S')
+    if the cost doesn't decrease from S to S':
+        return
 
+Make options that connect the states in S
 """
 
-def AverageShortestOptions_not_optimized(G, P, k, delta = 1, subgoal=False):
 
-    X = nx.to_networkx_graph(G)
-    if not nx.is_connected(X):
-        cs = list(nx.connected_components(X))
-        for c_ in cs:
-            if len(c_) > 1:
-                c = c_
-                break
-        Xsub = X.subgraph(c)
-        A = nx.to_numpy_matrix(Xsub)
-        print('connected comp =', c)
-    else:
-        A = G.copy()
-
+def AverageShortestOptionsIterative(G, Pairs, k, delta = 1): #avg, approx
+    A = G.copy()
     options = []
-
     while len(options) < k:
-
-        # pair wise distances in graph
-        D_dict = nx.all_pairs_shortest_path_length(nx.to_networkx_graph(A))
-        D = np.zeros(A.shape)
-        for source in D_dict:
-            for target in range(len(A)):
-                D[source[0],target] = source[1][target]
-
-        print(D)
-        print()
-
-        # weight of each node pair
-        W = np.zeros(A.shape)
-        for pair in P:
-            W[pair[0],pair[1]] += 1
-
-        duplicates = []
-        #for every node make duplicates
-        # each element of form:
-        # node that it is duplicate of, associated demand (weight), associated penalty
-        for i in range(len(A)):
-            for j in range(len(A)):
-                if i == j:
-                    continue
-                duplicates.append([i, W[i,j], max(0, W[i,j] * (D[i,j] - 2 * delta))])
-                duplicates.append([i, W[j,i], max(0, W[j,i] * (D[j,i] - 2 * delta))])
-
-
-
-        def cost(a,b):
-            cost = 0
-            for city in duplicates:
-                # choose the closest facility
-                f = a if D[a,city[0]] < D[b,city[0]] else b
-                #either connect and pay d * w or deny service and pay penalty
-                cost += min(D[f,city[0]]*city[1],city[2])
-
-                #print(city[0],min(D[f,city[0]]*city[1],city[2]))
-
-            return cost
-
-        S = [0, 1]
-        while True:
-
-            best_a = S[0]
-            best_b = S[1]
-            min_cost = cost(best_a, best_b)
-
-            for a in S:
-                for b in range(len(A)):
-                    if b in S:
-                        continue
-                    # loop over all a to remove from S and all b to add
-                    # because S is size 2 we can simply use a as our element left in
-                    # S after the other was removed.
-                    c = cost(a, b)
-                    print(a,b,c)
-                    if c < min_cost:
-                        best_a = a
-                        best_b = b
-                        min_cost = c
-
-            if S == [best_a, best_b]:
-                break
-            S = [best_a, best_b]
-
-        option = (S[0], S[1])
-        options.append(option)
-
-
-        if subgoal:
-            B = A.copy()
-            B[:, option[1]] = 1
-            B[option[1], :] = 1
-        else:
-            B = AddEdge(A, option[0], option[1])
-        #update graph
-        A = B
-
+        A, ops = AverageShortestOptions(A, Pairs, 1, delta = 1)
+        options.extend(ops)
     return A, options
 
-
-def AverageShortestOptions_Probably_Wrong(G, Pairs, k, delta = 1):
+"""
+A - adjacency matrix
+D - distance between pairs
+W - weight matrix
+P - cost
+"""
+def Get_A_D_W_P_Matrices(G, Pairs, delta):
     A = G.copy()
-
-    options = []
-
-    while len(options) < k:
-
-        # pair wise distances in graph
-        D_dict = nx.all_pairs_shortest_path_length(nx.to_networkx_graph(A))
-        D = np.zeros(A.shape,dtype='int')
-        for source in D_dict:
-            for target in range(len(A)):
-                D[source[0],target] = source[1][target]
-
-        # weight of each node pair
-        try:
-            W = get_weight_matrix(len(A),Pairs)
-        except:
-            W = np.ones((len(A),len(A)),dtype='int')
-
-        P_out = np.clip(W*(D-2*delta),0,None)
-        P_in = np.clip(W.T*(D-2*delta),0,None)
-        P = np.hstack((P_out,P_in))
-
-
-        C = np.hstack((W,W.T))
-
-        def cost(a,b):
-            D_min = np.minimum(D[a],D[b])
-            D_min = np.repeat(D_min[:,None].T,len(D_min),axis=0)
-            D_min = np.hstack((D_min,D_min))
-            M = C * D_min
-            return np.sum(np.minimum(P,M))
-
-        S = [0, 1]
-        while True:
-
-            best_a = S[0]
-            best_b = S[1]
-            min_cost = cost(best_a, best_b)
-
-            for a in S:
-                for b in range(len(A)):
-                    if b in S:
-                        continue
-                    # loop over all a to remove from S and all b to add
-                    # because S is size 2 we can simply use a as our element left in
-                    # S after the other was removed.
-                    c = cost(a, b)
-                    if c < min_cost:
-                        best_a = a
-                        best_b = b
-                        min_cost = c
-
-            if S == [best_a, best_b]:
-                break
-            S = [best_a, best_b]
-
-        option = (S[0], S[1])
-        options.append(option)
-
-
-
-        A[option[0],option[1]] = 1
-        A[option[1],option[0]] = 1
-
-    return A, options
-
-def AverageShortestOptions(G, Pairs, k, delta = 1):
-    A = G.copy()
-
-    options = []
 
     # pair wise distances in graph
     D_dict = nx.all_pairs_shortest_path_length(nx.to_networkx_graph(A))
@@ -194,7 +50,6 @@ def AverageShortestOptions(G, Pairs, k, delta = 1):
             D[source[0],target] = source[1][target]
 
     # weight of each node pair
-
     try:
         W = get_weight_matrix(len(A),Pairs)
     except:
@@ -203,9 +58,27 @@ def AverageShortestOptions(G, Pairs, k, delta = 1):
 
     P = np.clip(W*(D-2*delta),0,None)
 
+    return A, D, W, P
 
+"""
+S - set of facilities
+A - adjacency matrix
+"""
+def pack_options(S, A):
+    options = []
+    for i in range(1,len(S)):
+        option = (S[0], S[i])
+        options.append(option)
 
-    #F is a list of facilities (indicies)
+        A[option[0],option[1]] = 1
+        A[option[1],option[0]] = 1
+
+    return options
+
+def AverageShortestOptions(G, Pairs, k, delta = 1):
+    A, D, W, P = Get_A_D_W_P_Matrices(G, Pairs, delta)
+
+    #S is a list of facilities (indicies)
     def cost(S):
         cost = 0
         distances = np.amin(D[:,S],axis=1)
@@ -215,38 +88,39 @@ def AverageShortestOptions(G, Pairs, k, delta = 1):
             cost += np.sum(np.minimum(W_scaled[:,city], P[:,city]))
         return cost
 
-
-    S = list(range(k+1)) #need k+1 nodes for k edge star
+    S = np.array(range(0,len(A), len(A)//k)) #need k+1 nodes for k edge star
+    if len(S) < k+1:
+        S = np.append(S, len(A)-1)
     while True:
         min_cost = cost(S)
-        best_set = S.copy()
-
+        found_better = False
         # loop over all a to remove from S and all b to add
         for a in S:
             for b in range(len(A)):
                 if b in S:
                     continue
-                S_ = S.copy()
-                S_.remove(a)
-                S_.append(b)
+                S_ = np.copy(S)
+                S_smaller = np.delete(S_, np.argwhere(S_==a))
+                S_ = np.append(S_smaller, b)
 
                 c = cost(S_)
                 if c < min_cost:
+                    found_better = True
+                    S = S_
                     min_cost = c
-                    best_set = S_
 
-        if set(S) == set(best_set):
+                if found_better:
+                    break
+            else:
+                continue
             break
-        S = best_set
 
-    for i in range(1,len(S)):
-        option = (S[0], S[i])
-        options.append(option)
+        if not found_better:
+            break
 
-        A[option[0],option[1]] = 1
-        A[option[1],option[0]] = 1
-
+    options = pack_options(S, A)
     return A, options
+
 
 def BruteOptions(G, P, k, delta = 1, subgoal=False):
 
@@ -558,7 +432,7 @@ if __name__ == "__main__":
 
     #test_domain()
 
-    compare_to_brute_multiple_exp(75, 10 ,3)
+    compare_to_brute_multiple_exp(20, 10 ,3)
 
     #A, options = AverageShortestOptions(graph,P,3)
 
